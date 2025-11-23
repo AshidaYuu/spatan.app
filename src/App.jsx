@@ -135,10 +135,32 @@ const shuffle = (array) => {
   return newArr;
 };
 
+let cachedVoices = [];
+const loadVoices = () => {
+  cachedVoices = window.speechSynthesis.getVoices();
+  if (!cachedVoices.length) {
+    window.speechSynthesis.onvoiceschanged = () => {
+      cachedVoices = window.speechSynthesis.getVoices();
+    };
+  }
+};
+
+const getPreferredVoice = (lang = 'en-US') => {
+  if (!cachedVoices.length) loadVoices();
+  const exact = cachedVoices.find((v) => v.lang === lang);
+  if (exact) return exact;
+  const fallback = cachedVoices.find((v) => v.lang?.startsWith('en'));
+  return fallback || null;
+};
+
 const speak = (text, lang = 'en-US', onEnd) => {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  if (!cachedVoices.length) loadVoices();
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = lang;
+  const voice = getPreferredVoice(lang);
+  if (voice) utterance.voice = voice;
   utterance.rate = 1.0;
   if (onEnd) utterance.onend = onEnd;
   window.speechSynthesis.speak(utterance);
