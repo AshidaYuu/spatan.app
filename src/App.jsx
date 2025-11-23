@@ -22,6 +22,7 @@ import {
   Trash2,
   Edit,
   Save,
+  Download,
   Upload,
   Home,
   Sparkles,
@@ -1304,12 +1305,17 @@ const DeckEditor = ({ initialDeck, onSave, onCancel }) => {
   const [jsonInput, setJsonInput] = useState('');
   const [jsonError, setJsonError] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const fileInputRef = useRef(null);
 
-  if (!deck) {
+  useEffect(() => {
+    if (initialDeck) setDeck(initialDeck);
+  }, [initialDeck]);
+
+  if (!initialDeck || !deck) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full text-center space-y-4">
-          <p className="text-gray-600 font-bold">編集対象の単語帳が見つかりませんでした。</p>
+          <p className="text-gray-600 font-bold">単語帳の読み込み中...</p>
           <button
             onClick={onCancel}
             className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700"
@@ -1324,17 +1330,59 @@ const DeckEditor = ({ initialDeck, onSave, onCancel }) => {
   const handleJsonImport = () => {
     try {
       const data = JSON.parse(jsonInput);
-      if (!Array.isArray(data)) throw new Error('Data must be an array');
-      if (data.some((w) => !w.id || !w.spelling || !w.meaning_jp)) {
-        throw new Error('Invalid data format. id, spelling, meaning_jp are required.');
+      if (Array.isArray(data)) {
+        if (data.some((w) => !w.id || !w.spelling || !w.meaning_jp)) {
+          throw new Error('Invalid data format. id, spelling, meaning_jp are required.');
+        }
+        setDeck({ ...deck, words: [...deck.words, ...data] });
+        alert(`${data.length} words imported successfully!`);
+      } else if (data && typeof data === 'object' && Array.isArray(data.words)) {
+        setDeck({
+          ...deck,
+          title: data.title || deck.title,
+          description: data.description || deck.description,
+          color: data.color || deck.color,
+          words: data.words,
+        });
+        alert('Deck imported successfully!');
+      } else {
+        throw new Error('Invalid data format. Provide an array or deck object.');
       }
-      setDeck({ ...deck, words: [...deck.words, ...data] });
       setJsonInput('');
       setJsonError(null);
-      alert(`${data.length} words imported successfully!`);
     } catch (e) {
       setJsonError(e.message);
     }
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result;
+      if (typeof text === 'string') setJsonInput(text);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExportDeck = () => {
+    const payload = {
+      title: deck.title,
+      description: deck.description,
+      color: deck.color,
+      words: deck.words,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const safeTitle = deck.title?.replace(/[^a-z0-9_-]/gi, '_') || 'deck';
+    link.href = url;
+    link.download = `${safeTitle}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 500);
   };
 
   const handleAiImport = async () => {
@@ -1422,6 +1470,12 @@ const DeckEditor = ({ initialDeck, onSave, onCancel }) => {
               キャンセル
             </button>
             <button
+              onClick={handleExportDeck}
+              className="px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-50 flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" /> JSON書き出し
+            </button>
+            <button
               onClick={() => onSave(deck)}
               className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 flex items-center gap-2"
             >
@@ -1453,9 +1507,11 @@ const DeckEditor = ({ initialDeck, onSave, onCancel }) => {
 
         <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
           <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
-            <Upload className="w-5 h-5" /> AIデータ一括登録
+            <Upload className="w-5 h-5" /> 共有 / インポート
           </h3>
-          <p className="text-xs text-gray-500 mb-3">単語データのJSON配列を入力してください。</p>
+          <p className="text-xs text-gray-500 mb-2">
+            手入力のほか、JSONファイルを読み込んだり、書き出したJSONを友だちに渡して共有できます。Deck JSONにはタイトルや説明も含まれます。
+          </p>
           <textarea
             value={jsonInput}
             onChange={(e) => setJsonInput(e.target.value)}
@@ -1463,7 +1519,7 @@ const DeckEditor = ({ initialDeck, onSave, onCancel }) => {
             className="w-full h-32 border border-gray-300 rounded-lg p-3 font-mono text-xs mb-3 focus:ring-2 focus:ring-indigo-500 outline-none"
           />
           {jsonError && <p className="text-red-500 text-xs font-bold mb-3">{jsonError}</p>}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={handleJsonImport}
               className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-50 transition"
@@ -1478,7 +1534,15 @@ const DeckEditor = ({ initialDeck, onSave, onCancel }) => {
               {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               AI完全補完インポート
             </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-50 transition"
+            >
+              ファイルから読み込む
+            </button>
           </div>
+          <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={handleFileUpload} />
         </div>
 
         <div>
