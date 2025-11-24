@@ -17,72 +17,10 @@ import {
   List,
   MessageCircle,
   LogOut,
-  Plus,
-  Settings,
-  Trash2,
-  Edit,
-  Save,
-  Download,
-  Upload,
   Home,
-  Sparkles,
-  Loader2,
 } from 'lucide-react';
-
-// ==========================================
-// 1. Default Data (Initial Deck)
-// ==========================================
-const TARGET_1900_DATA = [
-  {
-    id: 1801,
-    spelling: 'deduce',
-    meaning_jp: 'を推測する，演繹する',
-    meaning_simple: '証拠を使って、答えを導き出す',
-    phonetic: '/dɪˈduːs/',
-    katakana: 'ディデュース',
-    etymology: 'de(下へ) + duce(導く) → 結論を引き出す',
-    scene: '🕵️‍♂️ 推理',
-    story: '探偵が、現場に残された足跡から犯人を推測した。',
-    example: 'The detective deduced the truth from the footprint.',
-    example_jp: '探偵は足跡から真実を推測した。',
-  },
-  {
-    id: 1802,
-    spelling: 'simulate',
-    meaning_jp: 'を模擬実験する；を装う；をまねる',
-    meaning_simple: 'フリをする、マネをして試す',
-    phonetic: '/ˈsɪmjʊleɪt/',
-    katakana: 'シミュレイト',
-    etymology: 'simul(似ている) + ate(する) → マネをする',
-    scene: '🎮 実験・訓練',
-    story: 'パイロットがフライトシミュレーターで飛行訓練をする。',
-    example: 'We simulated a fire drill at school.',
-    example_jp: '学校で避難訓練のシミュレーション（マネ）をした。',
-  },
-  {
-    id: 1803,
-    spelling: 'merge',
-    meaning_jp: '合併する',
-    meaning_simple: '２つが１つになる',
-    phonetic: '/mɜːrdʒ/',
-    katakana: 'マージ',
-    etymology: 'mergere(沈める)',
-    scene: '🏢 ビジネス',
-    story: '会社が合併した。',
-    example: 'Two companies merged.',
-    example_jp: '２つの会社が合併した。',
-  },
-  ...Array.from({ length: 5 }, (_, i) => ({
-    id: 1811 + i,
-    spelling: `sample${1811 + i}`,
-    meaning_jp: 'サンプル',
-    meaning_simple: 'サンプル',
-    phonetic: '/sæmpl/',
-    katakana: 'サンプル',
-    example: 'This is a sample.',
-    example_jp: 'これはサンプルです。',
-  })),
-];
+import target1900Data from './data/target1900.json';
+import illustrated805Data from './data/illustrated805.json';
 
 const DECK_COLOR_STYLES = {
   indigo: {
@@ -106,12 +44,35 @@ const DECK_COLOR_STYLES = {
 const INITIAL_DECKS = [
   {
     id: 'deck_target1900',
-    title: 'ターゲット1900 (1801~1900)',
+    title: 'ターゲット1900',
     description: '大学入試・難関レベルの必須単語',
-    words: TARGET_1900_DATA,
+    words: target1900Data,
     color: 'indigo',
   },
+  {
+    id: 'deck_illustrated805',
+    title: 'イラスト英単語805',
+    description: 'イラストで覚える英単語・最初の100語',
+    words: illustrated805Data,
+    color: 'teal',
+  },
 ];
+
+const ensureDefaultDecks = (loadedDecks = []) => {
+  const merged = [...loadedDecks];
+  INITIAL_DECKS.forEach((defaultDeck) => {
+    const existingIndex = merged.findIndex((deck) => deck.id === defaultDeck.id);
+    if (existingIndex >= 0) {
+      merged[existingIndex] = {
+        ...merged[existingIndex],
+        ...defaultDeck,
+      };
+    } else {
+      merged.push(defaultDeck);
+    }
+  });
+  return merged;
+};
 
 const CONFUSING_WORDS = [
   { spelling: 'reduce', meaning_jp: '減らす' },
@@ -404,14 +365,13 @@ export default function App() {
       const saved = window.localStorage.getItem('espartan_decks_v2');
       if (!saved) return INITIAL_DECKS;
       const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : INITIAL_DECKS;
+      return ensureDefaultDecks(Array.isArray(parsed) ? parsed : INITIAL_DECKS);
     } catch (error) {
       console.error('Failed to load decks from storage', error);
       return INITIAL_DECKS;
     }
   });
   const [currentDeck, setCurrentDeck] = useState(null);
-  const [editingDeckId, setEditingDeckId] = useState(null);
   const [studyMode, setStudyMode] = useState('learn');
   const [completionMode, setCompletionMode] = useState('learn');
 
@@ -451,30 +411,6 @@ export default function App() {
   const inputRef = useRef(null);
   const testInputRef = useRef(null);
   const testResetTimeoutRef = useRef(null);
-
-  const handleCreateDeck = () => {
-    const newDeck = {
-      id: `deck_${Date.now()}`,
-      title: '新規単語帳',
-      description: '新しい単語セット',
-      words: [],
-      color: 'gray',
-    };
-    setDecks([...decks, newDeck]);
-    setEditingDeckId(newDeck.id);
-    setAppPhase('deck_editor');
-  };
-
-  const handleDeleteDeck = (deckId) => {
-    if (window.confirm('本当にこの単語帳を削除しますか？')) {
-      setDecks(decks.filter((d) => d.id !== deckId));
-    }
-  };
-
-  const handleSaveDeck = (updatedDeck) => {
-    setDecks(decks.map((d) => (d.id === updatedDeck.id ? updatedDeck : d)));
-    setAppPhase('admin');
-  };
 
   const handleSelectDeck = (deck) => {
     setCurrentDeck(deck);
@@ -775,12 +711,6 @@ export default function App() {
             <h1 className="text-2xl font-black text-gray-800 flex items-center gap-2">
               <Award className="w-8 h-8 text-indigo-600" /> E-Spartan
             </h1>
-            <button
-              onClick={() => setAppPhase('admin')}
-              className="p-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-100 text-gray-600"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
           </div>
 
           <div className="grid gap-4">
@@ -813,72 +743,10 @@ export default function App() {
               </div>
             ))}
 
-            <button
-              onClick={() => setAppPhase('admin')}
-              className="bg-gray-100 border-2 border-dashed border-gray-300 p-5 rounded-2xl flex flex-col items-center justify-center text-gray-400 hover:bg-gray-200 hover:border-gray-400 transition-all"
-            >
-              <Plus className="w-8 h-8 mb-1" />
-              <span className="font-bold text-sm">単語帳を追加・管理</span>
-            </button>
           </div>
         </div>
       </div>
     );
-  }
-
-  if (appPhase === 'admin') {
-    return (
-      <div className="min-h-screen bg-gray-50 p-4 font-sans">
-        <div className="max-w-md mx-auto">
-          <div className="flex items-center gap-2 mb-6">
-            <button onClick={() => setAppPhase('home')} className="text-gray-500 hover:text-gray-800">
-              <ArrowRightLeft className="w-6 h-6" />
-            </button>
-            <h2 className="text-xl font-bold text-gray-800">単語帳管理</h2>
-          </div>
-
-          <div className="space-y-4">
-            {decks.map((deck) => (
-              <div key={deck.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex justify-between items-center">
-                <div>
-                  <h3 className="font-bold text-gray-800">{deck.title}</h3>
-                  <p className="text-xs text-gray-500">{deck.words.length} words</p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setEditingDeckId(deck.id);
-                      setAppPhase('deck_editor');
-                    }}
-                    className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteDeck(deck.id)}
-                    className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={handleCreateDeck}
-            className="w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2"
-          >
-            <Plus className="w-5 h-5" /> 新規作成
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (appPhase === 'deck_editor') {
-    const deckToEdit = decks.find((d) => d.id === editingDeckId);
-    return <DeckEditor initialDeck={deckToEdit} onSave={handleSaveDeck} onCancel={() => setAppPhase('admin')} />;
   }
 
   if (appPhase === 'setup') {
@@ -1322,283 +1190,3 @@ export default function App() {
     </div>
   );
 }
-const DeckEditor = ({ initialDeck, onSave, onCancel }) => {
-  const [deck, setDeck] = useState(initialDeck);
-  const [jsonInput, setJsonInput] = useState('');
-  const [jsonError, setJsonError] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const fileInputRef = useRef(null);
-
-  useEffect(() => {
-    if (initialDeck) setDeck(initialDeck);
-  }, [initialDeck]);
-
-  if (!initialDeck || !deck) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full text-center space-y-4">
-          <p className="text-gray-600 font-bold">単語帳の読み込み中...</p>
-          <button
-            onClick={onCancel}
-            className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700"
-          >
-            戻る
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const handleJsonImport = () => {
-    try {
-      const data = JSON.parse(jsonInput);
-      if (Array.isArray(data)) {
-        if (data.some((w) => !w.id || !w.spelling || !w.meaning_jp)) {
-          throw new Error('Invalid data format. id, spelling, meaning_jp are required.');
-        }
-        setDeck({ ...deck, words: [...deck.words, ...data] });
-        alert(`${data.length} words imported successfully!`);
-      } else if (data && typeof data === 'object' && Array.isArray(data.words)) {
-        setDeck({
-          ...deck,
-          title: data.title || deck.title,
-          description: data.description || deck.description,
-          color: data.color || deck.color,
-          words: data.words,
-        });
-        alert('Deck imported successfully!');
-      } else {
-        throw new Error('Invalid data format. Provide an array or deck object.');
-      }
-      setJsonInput('');
-      setJsonError(null);
-    } catch (e) {
-      setJsonError(e.message);
-    }
-  };
-
-  const handleFileUpload = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result;
-      if (typeof text === 'string') setJsonInput(text);
-    };
-    reader.readAsText(file);
-  };
-
-  const handleExportDeck = () => {
-    const payload = {
-      title: deck.title,
-      description: deck.description,
-      color: deck.color,
-      words: deck.words,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const safeTitle = deck.title?.replace(/[^a-z0-9_-]/gi, '_') || 'deck';
-    link.href = url;
-    link.download = `${safeTitle}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(url), 500);
-  };
-
-  const handleAiImport = async () => {
-    if (!jsonInput.trim()) return;
-    setIsGenerating(true);
-    setJsonError(null);
-
-    try {
-      let inputWords = [];
-      try {
-        inputWords = JSON.parse(jsonInput);
-      } catch (e) {
-        throw new Error('まずは正しいJSON形式（配列）で入力してください。必須項目: id, spelling');
-      }
-
-      if (!Array.isArray(inputWords)) throw new Error('データは配列形式（[]）である必要があります。');
-
-      const apiKey = '';
-      const prompt = `
-        あなたは英単語学習アプリのデータジェネレーターです。
-        以下の入力データにある英単語について、不足している情報を補完し、完全なJSONデータを生成してください。
-
-        【必須要件】
-        - 入力された id, spelling, meaning_jp は維持する（meaning_jpがない場合は生成する）。
-        - 以下のフィールドを必ず含めること:
-          - meaning_simple: 小学生でもわかる簡単な意味（ひらがな多め、直感的）
-          - phonetic: 発音記号
-          - katakana: カタカナ読み
-          - etymology: 語源（簡潔に。"接頭辞 + 語根 → 意味" の形式推奨）
-          - scene: その単語が使われる場面（絵文字1つ + 場面名。例: 🏢 ビジネス）
-          - story: その場面の短いストーリー（主語と目的語を入れる。例: "部長が会議で計画を提案した。"）
-          - example: 簡単な英語例文
-          - example_jp: 例文の和訳
-        - 出力は JSON 配列のみ。Markdown記法は不要。
-
-        【入力データ】
-        ${JSON.stringify(inputWords)}
-      `;
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              responseMimeType: 'application/json',
-            },
-          }),
-        },
-      );
-
-      if (!response.ok) throw new Error('AI生成に失敗しました。時間をおいて再度お試しください。');
-
-      const data = await response.json();
-      const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!generatedText) throw new Error('AIからの応答が空でした。');
-
-      const completedWords = JSON.parse(generatedText);
-
-      setDeck({ ...deck, words: [...deck.words, ...completedWords] });
-      setJsonInput('');
-    } catch (e) {
-      setJsonError(e.message);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleDeleteWord = (wordId) => {
-    if (window.confirm('この単語を削除しますか？')) {
-      setDeck({ ...deck, words: deck.words.filter((w) => w.id !== wordId) });
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-white p-6 font-sans">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">単語帳の編集</h2>
-          <div className="flex gap-2">
-            <button onClick={onCancel} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg">
-              キャンセル
-            </button>
-            <button
-              onClick={handleExportDeck}
-              className="px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-50 flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" /> JSON書き出し
-            </button>
-            <button
-              onClick={() => onSave(deck)}
-              className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 flex items-center gap-2"
-            >
-              <Save className="w-4 h-4" /> 保存
-            </button>
-          </div>
-        </div>
-
-        <div className="mb-8 space-y-4">
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">タイトル</label>
-            <input
-              type="text"
-              value={deck.title}
-              onChange={(e) => setDeck({ ...deck, title: e.target.value })}
-              className="w-full border-2 border-gray-200 rounded-lg p-3"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">説明</label>
-            <input
-              type="text"
-              value={deck.description}
-              onChange={(e) => setDeck({ ...deck, description: e.target.value })}
-              className="w-full border-2 border-gray-200 rounded-lg p-3"
-            />
-          </div>
-        </div>
-
-        <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
-          <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
-            <Upload className="w-5 h-5" /> 共有 / インポート
-          </h3>
-          <p className="text-xs text-gray-500 mb-2">
-            手入力のほか、JSONファイルを読み込んだり、書き出したJSONを友だちに渡して共有できます。Deck JSONにはタイトルや説明も含まれます。
-          </p>
-          <textarea
-            value={jsonInput}
-            onChange={(e) => setJsonInput(e.target.value)}
-            placeholder='[{"id": 1901, "spelling": "modify", "meaning_jp": "修正する"}]'
-            className="w-full h-32 border border-gray-300 rounded-lg p-3 font-mono text-xs mb-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-          />
-          {jsonError && <p className="text-red-500 text-xs font-bold mb-3">{jsonError}</p>}
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={handleJsonImport}
-              className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-50 transition"
-            >
-              通常インポート
-            </button>
-            <button
-              onClick={handleAiImport}
-              disabled={isGenerating}
-              className={`bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-200 transition flex items-center gap-2 ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              AI完全補完インポート
-            </button>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-50 transition"
-            >
-              ファイルから読み込む
-            </button>
-          </div>
-          <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={handleFileUpload} />
-        </div>
-
-        <div>
-          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <List className="w-5 h-5" /> 登録済み単語 ({deck.words.length})
-          </h3>
-          {deck.words.length === 0 ? (
-            <p className="text-center text-gray-400 py-8">まだ単語がありません。</p>
-          ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {deck.words
-                .slice()
-                .sort((a, b) => a.id - b.id)
-                .map((word) => (
-                  <div
-                    key={word.id}
-                    className="flex items-center justify-between bg-white border border-gray-100 p-3 rounded-lg shadow-sm"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-mono text-gray-400 w-10">{word.id}</span>
-                      <div>
-                        <p className="font-bold text-gray-800">{word.spelling}</p>
-                        <p className="text-xs text-gray-500">{word.meaning_jp}</p>
-                      </div>
-                    </div>
-                    <button onClick={() => handleDeleteWord(word.id)} className="text-gray-300 hover:text-red-500">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
